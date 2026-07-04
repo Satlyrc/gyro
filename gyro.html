@@ -279,15 +279,44 @@
     const b = cur.b - off.b;
     const g = cur.g - off.g;
 
-    // Порядок W3C: Z(alpha) · X'(beta) · Y''(gamma). Знаки подобраны так,
-    // чтобы модель повторяла реальный наклон телефона в руке.
-    rig.style.transform =
-      `rotateZ(${a}deg) rotateX(${-b}deg) rotateY(${g}deg)`;
+    // Euler -> полная матрица поворота, применяем одним matrix3d.
+    // Композиция rotateZ/X/Y в CSS ловит gimbal lock на вертикали;
+    // в матричной форме 180°-скачки углов компенсируются и проход
+    // через полюс непрерывен.
+    rig.style.transform = orientMatrix(a, b, g);
 
     elA.textContent = ((a%360+360)%360).toFixed(0);
     elB.textContent = fmt(b);
     elG.textContent = fmt(g);
     status.innerHTML = 'АКТИВНО · <span class="live">СИГНАЛ ЕСТЬ</span>';
+  }
+
+  const DEG = Math.PI/180;
+  function orientMatrix(alphaDeg, betaDeg, gammaDeg){
+    const a=alphaDeg*DEG, b=betaDeg*DEG, g=gammaDeg*DEG;
+    const cA=Math.cos(a), sA=Math.sin(a);
+    const cB=Math.cos(b), sB=Math.sin(b);
+    const cG=Math.cos(g), sG=Math.sin(g);
+
+    // R = Rz(α)·Rx(β)·Ry(γ), порядок W3C (Z·X'·Y''). m_ij — строка/столбец.
+    const m11 =  cA*cG - sA*sB*sG;
+    const m12 = -cB*sA;
+    const m13 =  cA*sG + cG*sA*sB;
+    const m21 =  cG*sA + cA*sB*sG;
+    const m22 =  cA*cB;
+    const m23 =  sA*sG - cA*cG*sB;
+    const m31 = -cB*sG;
+    const m32 =  sB;
+    const m33 =  cB*cG;
+
+    // matrix3d — column-major. Экранная ось Y смотрит вниз, сенсорная вверх,
+    // поэтому переворот по Y: сопряжение diag(1,-1,1) меняет знак у m12,m21,m23,m32.
+    return 'matrix3d(' + [
+       m11, -m21,  m31, 0,
+      -m12,  m22, -m32, 0,
+       m13, -m23,  m33, 0,
+         0,    0,    0, 1
+    ].join(',') + ')';
   }
 
   function onMotion(e){
