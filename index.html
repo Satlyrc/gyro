@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ПОЛОЖЕНИЕ УСТРОЙСТВА</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1418;
+    --panel:#0F1D22;
+    --grid:#183036;
+    --phos:#4FD6C4;      /* фосфорный циан */
+    --phos-dim:#2A6E68;
+    --amber:#E8A33D;      /* аварийный янтарь */
+    --ink:#DCE6E4;
+    --ink-dim:#5E7B7C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #12262B 0%, var(--bg) 55%),
+      var(--bg);
+    color:var(--ink);
+    font-family:"IBM Plex Mono",monospace;
+    overflow:hidden;
+    -webkit-user-select:none;user-select:none;
+    display:flex;flex-direction:column;
+  }
+  /* сканлайны для приборного налёта */
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.14) 2px 3px);
+    mix-blend-mode:multiply;opacity:.5;
+  }
+
+  header{
+    padding:14px 18px 10px;
+    display:flex;align-items:baseline;justify-content:space-between;
+    border-bottom:1px solid var(--grid);
+  }
+  header h1{
+    font-family:"Space Grotesk",sans-serif;
+    font-size:13px;font-weight:700;letter-spacing:.32em;
+    color:var(--ink);text-transform:uppercase;
+  }
+  header .tag{font-size:10px;letter-spacing:.2em;color:var(--ink-dim)}
+  header .live{color:var(--phos)}
+  header .dead{color:var(--amber)}
+
+  /* сцена с карданом */
+  .scene{
+    flex:1;position:relative;
+    perspective:900px;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  /* горизонт-сетка на фоне */
+  .horizon{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(var(--grid) 1px,transparent 1px),
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 0%,transparent 72%);
+            mask-image:radial-gradient(circle at 50% 50%,#000 0%,transparent 72%);
+    opacity:.55;
+  }
+  .crosshair{position:absolute;width:220px;height:220px;pointer-events:none}
+  .crosshair::before,.crosshair::after{
+    content:"";position:absolute;background:var(--phos-dim);
+  }
+  .crosshair::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-.5px)}
+  .crosshair::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-.5px)}
+
+  .rig{
+    position:relative;width:200px;height:200px;
+    transform-style:preserve-3d;
+    transform:rotateX(0) rotateY(0) rotateZ(0);
+    will-change:transform;
+  }
+  /* карданные кольца — по одному на угол */
+  .ring{
+    position:absolute;inset:0;border-radius:50%;
+    transform-style:preserve-3d;
+  }
+  .ring b{
+    position:absolute;inset:0;border-radius:50%;
+    border:1.5px solid var(--phos-dim);
+  }
+  .ring.yaw   b{border-color:#2C5C7A;box-shadow:0 0 12px #1a3a4d inset}
+  .ring.pitch{transform:rotateX(90deg) scale(.82)}
+  .ring.pitch b{border-color:#2A6E68}
+  .ring.roll {transform:rotateY(90deg) scale(.64)}
+  .ring.roll  b{border-color:#7A5A26}
+  /* метка-индекс на кольцах */
+  .ring .idx{
+    position:absolute;top:-4px;left:50%;width:7px;height:7px;
+    transform:translateX(-50%);border-radius:50%;
+  }
+  .ring.yaw  .idx{background:#4FA6D6}
+  .ring.pitch .idx{background:var(--phos)}
+  .ring.roll  .idx{background:var(--amber)}
+
+  /* сам телефон-слэб */
+  .phone{
+    position:absolute;top:50%;left:50%;
+    width:64px;height:128px;margin:-64px 0 0 -32px;
+    transform-style:preserve-3d;
+  }
+  .face{position:absolute;border-radius:9px}
+  .screen{
+    inset:0;
+    background:linear-gradient(160deg,#123 0%,#0a1a1e 70%);
+    border:1.5px solid var(--phos);
+    box-shadow:0 0 18px rgba(79,214,196,.35),0 0 6px rgba(79,214,196,.5) inset;
+    transform:translateZ(7px);
+    overflow:hidden;
+  }
+  .screen::before{ /* вырез камеры */
+    content:"";position:absolute;top:6px;left:50%;transform:translateX(-50%);
+    width:20px;height:4px;border-radius:3px;background:#04090a;
+  }
+  .screen::after{ /* «верх экрана» стрелка-ориентир */
+    content:"▲";position:absolute;top:16px;left:0;right:0;text-align:center;
+    color:var(--phos);font-size:13px;opacity:.8;
+  }
+  .back{
+    inset:0;background:#0a1417;border:1.5px solid #21454a;
+    transform:translateZ(-7px) rotateY(180deg);
+  }
+  .edge{background:#0d1e22;border:1px solid #1c3b40}
+  .edge.t{top:0;left:0;width:64px;height:14px;transform:rotateX(90deg) translateZ(7px);border-radius:3px}
+  .edge.b{bottom:0;left:0;width:64px;height:14px;transform:rotateX(-90deg) translateZ(121px);border-radius:3px}
+  .edge.l{top:0;left:0;width:14px;height:128px;transform:rotateY(-90deg) translateZ(7px);border-radius:3px}
+  .edge.r{top:0;right:0;width:14px;height:128px;transform:rotateY(90deg) translateZ(57px);border-radius:3px}
+
+  /* нижняя приборная панель */
+  .readout{
+    border-top:1px solid var(--grid);
+    background:linear-gradient(180deg,rgba(15,29,34,.6),rgba(11,20,24,.9));
+    padding:12px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+  .angles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+  .cell{
+    background:var(--panel);border:1px solid var(--grid);border-radius:6px;
+    padding:8px 6px;text-align:center;position:relative;
+  }
+  .cell .lbl{font-size:9px;letter-spacing:.22em;color:var(--ink-dim);margin-bottom:3px}
+  .cell .val{font-size:26px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+  .cell .u{font-size:11px;color:var(--ink-dim);margin-left:1px}
+  .cell.yaw   .val{color:#6FC3EE}
+  .cell.pitch .val{color:var(--phos)}
+  .cell.roll  .val{color:var(--amber)}
+  .cell .sub{font-size:8px;color:var(--ink-dim);margin-top:4px;letter-spacing:.1em}
+
+  .aux{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:10px;color:var(--ink-dim);letter-spacing:.08em;
+  }
+  .aux .g{color:var(--phos)}
+  .btns{display:flex;gap:8px}
+  button{
+    font-family:inherit;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    background:transparent;color:var(--phos);
+    border:1px solid var(--phos-dim);border-radius:5px;
+    padding:8px 12px;cursor:pointer;transition:background .15s,color .15s;
+  }
+  button:hover{background:rgba(79,214,196,.12)}
+  button:focus-visible{outline:2px solid var(--phos);outline-offset:2px}
+  button.warn{color:var(--amber);border-color:#7A5A26}
+  button.warn:hover{background:rgba(232,163,61,.12)}
+
+  /* стартовый оверлей (нужен жест для iOS-разрешения) */
+  .gate{
+    position:fixed;inset:0;z-index:40;
+    background:rgba(7,13,15,.94);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:32px;gap:18px;
+  }
+  .gate h2{font-family:"Space Grotesk",sans-serif;font-size:16px;letter-spacing:.1em;color:var(--ink)}
+  .gate p{font-size:12px;line-height:1.7;color:var(--ink-dim);max-width:300px}
+  .gate button{font-size:12px;padding:12px 22px}
+  .hidden{display:none!important}
+
+  @media (prefers-reduced-motion:reduce){
+    .rig{transition:none!important}
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Положение</h1>
+    <span class="tag" id="status">ОЖИДАНИЕ · <span class="dead">НЕТ СИГНАЛА</span></span>
+  </header>
+
+  <div class="scene" aria-hidden="true">
+    <div class="horizon"></div>
+    <div class="crosshair"></div>
+    <div class="rig" id="rig">
+      <div class="ring yaw"><b></b><span class="idx"></span></div>
+      <div class="ring pitch"><b></b><span class="idx"></span></div>
+      <div class="ring roll"><b></b><span class="idx"></span></div>
+      <div class="phone">
+        <div class="face screen"></div>
+        <div class="face back"></div>
+        <div class="face edge t"></div>
+        <div class="face edge b"></div>
+        <div class="face edge l"></div>
+        <div class="face edge r"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="angles">
+      <div class="cell yaw">
+        <div class="lbl">YAW · α</div>
+        <div><span class="val" id="a">—</span><span class="u">°</span></div>
+        <div class="sub">КОМПАС Z</div>
+      </div>
+      <div class="cell pitch">
+        <div class="lbl">PITCH · β</div>
+        <div><span class="val" id="b">—</span><span class="u">°</span></div>
+        <div class="sub">НАКЛОН X</div>
+      </div>
+      <div class="cell roll">
+        <div class="lbl">ROLL · γ</div>
+        <div><span class="val" id="g">—</span><span class="u">°</span></div>
+        <div class="sub">КРЕН Y</div>
+      </div>
+    </div>
+    <div class="aux">
+      <span>ГРАВИТАЦИЯ <span class="g" id="grav">0.00, 0.00, 0.00</span> g</span>
+      <div class="btns">
+        <button id="zero" type="button">Ноль</button>
+        <button id="unzero" class="warn hidden" type="button">Сброс</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="gate" id="gate">
+    <h2>ГИРОСКОП / АКСЕЛЕРОМЕТР</h2>
+    <p>Отрисовка физического положения телефона в реальном времени по датчикам ориентации. Нужен доступ к сенсорам движения.</p>
+    <button id="start" type="button">Запустить датчики</button>
+    <p id="gerr" style="color:var(--amber)"></p>
+  </div>
+
+<script>
+(function(){
+  const rig   = document.getElementById('rig');
+  const elA   = document.getElementById('a');
+  const elB   = document.getElementById('b');
+  const elG   = document.getElementById('g');
+  const grav  = document.getElementById('grav');
+  const status= document.getElementById('status');
+  const gate  = document.getElementById('gate');
+  const gerr  = document.getElementById('gerr');
+  const zeroBtn   = document.getElementById('zero');
+  const unzeroBtn = document.getElementById('unzero');
+
+  // смещение «нуля» для калибровки
+  let off = {a:0,b:0,g:0}, zeroed=false;
+  let cur = {a:0,b:0,g:0}, have=false;
+
+  const fmt = v => (v>=0?' ':'') + v.toFixed(1).padStart(4,' ');
+
+  function onOrient(e){
+    if(e.alpha==null && e.beta==null && e.gamma==null) return;
+    have = true;
+    cur.a = e.alpha || 0;
+    cur.b = e.beta  || 0;
+    cur.g = e.gamma || 0;
+
+    const a = cur.a - off.a;
+    const b = cur.b - off.b;
+    const g = cur.g - off.g;
+
+    // Порядок W3C: Z(alpha) · X'(beta) · Y''(gamma). Знаки подобраны так,
+    // чтобы модель повторяла реальный наклон телефона в руке.
+    rig.style.transform =
+      `rotateZ(${a}deg) rotateX(${-b}deg) rotateY(${g}deg)`;
+
+    elA.textContent = ((a%360+360)%360).toFixed(0);
+    elB.textContent = fmt(b);
+    elG.textContent = fmt(g);
+    status.innerHTML = 'АКТИВНО · <span class="live">СИГНАЛ ЕСТЬ</span>';
+  }
+
+  function onMotion(e){
+    const acc = e.accelerationIncludingGravity;
+    if(!acc) return;
+    const gx=(acc.x||0)/9.81, gy=(acc.y||0)/9.81, gz=(acc.z||0)/9.81;
+    grav.textContent = `${gx.toFixed(2)}, ${gy.toFixed(2)}, ${gz.toFixed(2)}`;
+  }
+
+  function attach(){
+    window.addEventListener('deviceorientation', onOrient, true);
+    window.addEventListener('devicemotion', onMotion, true);
+    // если через 1.2с тишина — скорее всего нет сенсоров / не https
+    setTimeout(()=>{ if(!have){
+      status.innerHTML='НЕТ ДАННЫХ · <span class="dead">ПРОВЕРЬ HTTPS</span>';
+    }},1200);
+  }
+
+  function start(){
+    const D = window.DeviceOrientationEvent, M = window.DeviceMotionEvent;
+    const needsPerm = D && typeof D.requestPermission === 'function';
+    if(needsPerm){
+      Promise.all([
+        D.requestPermission(),
+        (M && typeof M.requestPermission==='function') ? M.requestPermission() : Promise.resolve('granted')
+      ]).then(res=>{
+        if(res[0]==='granted'){ gate.classList.add('hidden'); attach(); }
+        else gerr.textContent='Доступ отклонён. Разреши в настройках Safari.';
+      }).catch(err=>{ gerr.textContent='Ошибка: '+err.message; });
+    }else if(D){
+      gate.classList.add('hidden'); attach();
+    }else{
+      gerr.textContent='DeviceOrientation не поддерживается этим браузером.';
+    }
+  }
+
+  document.getElementById('start').addEventListener('click', start);
+
+  zeroBtn.addEventListener('click', ()=>{
+    off = {a:cur.a, b:cur.b, g:cur.g}; zeroed=true;
+    unzeroBtn.classList.remove('hidden');
+  });
+  unzeroBtn.addEventListener('click', ()=>{
+    off = {a:0,b:0,g:0}; zeroed=false;
+    unzeroBtn.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>
