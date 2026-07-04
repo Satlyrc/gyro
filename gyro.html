@@ -262,9 +262,14 @@
   const zeroBtn   = document.getElementById('zero');
   const unzeroBtn = document.getElementById('unzero');
 
-  // смещение «нуля» для калибровки
+  // смещение «нуля» для калибровки (Euler-путь)
   let off = {a:0,b:0,g:0}, zeroed=false;
   let cur = {a:0,b:0,g:0}, have=false;
+
+  // кватернионный путь (Generic Sensor API)
+  let visualFromQuat = false;   // если true — визуал берём с кватерниона, а не с Эйлера
+  let curQ = [0,0,0,1];         // последний сырой кватернион [x,y,z,w]
+  let refQ = null;              // опорный кватернион для «нуля» (сопряжённый)
 
   const fmt = v => (v>=0?' ':'') + v.toFixed(1).padStart(4,' ');
 
@@ -279,12 +284,11 @@
     const b = cur.b - off.b;
     const g = cur.g - off.g;
 
-    // Euler -> полная матрица поворота, применяем одним matrix3d.
-    // Композиция rotateZ/X/Y в CSS ловит gimbal lock на вертикали;
-    // в матричной форме 180°-скачки углов компенсируются и проход
-    // через полюс непрерывен.
-    rig.style.transform = orientMatrix(a, b, g);
+    // Визуал рисуем из Эйлера только если нет кватернионного сенсора.
+    // Кватернион свободен от gimbal lock; Эйлер — фолбэк (iOS Safari).
+    if(!visualFromQuat) rig.style.transform = matFromEuler(a, b, g);
 
+    // числа всегда из DeviceOrientation — это просто телеметрия
     elA.textContent = ((a%360+360)%360).toFixed(0);
     elB.textContent = fmt(b);
     elG.textContent = fmt(g);
@@ -292,31 +296,52 @@
   }
 
   const DEG = Math.PI/180;
-  function orientMatrix(alphaDeg, betaDeg, gammaDeg){
-    const a=alphaDeg*DEG, b=betaDeg*DEG, g=gammaDeg*DEG;
-    const cA=Math.cos(a), sA=Math.sin(a);
-    const cB=Math.cos(b), sB=Math.sin(b);
-    const cG=Math.cos(g), sG=Math.sin(g);
 
-    // R = Rz(α)·Rx(β)·Ry(γ), порядок W3C (Z·X'·Y''). m_ij — строка/столбец.
-    const m11 =  cA*cG - sA*sB*sG;
-    const m12 = -cB*sA;
-    const m13 =  cA*sG + cG*sA*sB;
-    const m21 =  cG*sA + cA*sB*sG;
-    const m22 =  cA*cB;
-    const m23 =  sA*sG - cA*cG*sB;
-    const m31 = -cB*sG;
-    const m32 =  sB;
-    const m33 =  cB*cG;
-
-    // matrix3d — column-major. Экранная ось Y смотрит вниз, сенсорная вверх,
-    // поэтому переворот по Y: сопряжение diag(1,-1,1) меняет знак у m12,m21,m23,m32.
+  // Общий эмиттер: строки R (row-major) -> строка CSS matrix3d (column-major).
+  // Экранная Y смотрит вниз, сенсорная вверх => переворот по Y (сопряжение
+  // diag(1,-1,1)) меняет знак у m12,m21,m23,m32.
+  function css3d(m11,m12,m13, m21,m22,m23, m31,m32,m33){
     return 'matrix3d(' + [
        m11, -m21,  m31, 0,
       -m12,  m22, -m32, 0,
        m13, -m23,  m33, 0,
          0,    0,    0, 1
     ].join(',') + ')';
+  }
+
+  // Euler (W3C, Z·X'·Y'') -> matrix3d. Фолбэк для платформ без Generic Sensor.
+  function matFromEuler(alphaDeg, betaDeg, gammaDeg){
+    const a=alphaDeg*DEG, b=betaDeg*DEG, g=gammaDeg*DEG;
+    const cA=Math.cos(a), sA=Math.sin(a);
+    const cB=Math.cos(b), sB=Math.sin(b);
+    const cG=Math.cos(g), sG=Math.sin(g);
+    return css3d(
+      cA*cG - sA*sB*sG,  -cB*sA,  cA*sG + cG*sA*sB,
+      cG*sA + cA*sB*sG,   cA*cB,  sA*sG - cA*cG*sB,
+      -cB*sG,             sB,     cB*cG
+    );
+  }
+
+  // Кватернион [x,y,z,w] -> matrix3d. Без сингулярностей.
+  function matFromQuat(x,y,z,w){
+    const xx=x*x, yy=y*y, zz=z*z;
+    const xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
+    return css3d(
+      1-2*(yy+zz),  2*(xy-wz),    2*(xz+wy),
+      2*(xy+wz),    1-2*(xx+zz),  2*(yz-wx),
+      2*(xz-wy),    2*(yz+wx),    1-2*(xx+yy)
+    );
+  }
+
+  // Кватернионная арифметика для калибровки «нуля»
+  const qConj = q => [-q[0],-q[1],-q[2], q[3]];
+  function qMul(a,b){
+    return [
+      a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1],
+      a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0],
+      a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3],
+      a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2]
+    ];
   }
 
   function onMotion(e){
@@ -326,7 +351,32 @@
     grav.textContent = `${gx.toFixed(2)}, ${gy.toFixed(2)}, ${gz.toFixed(2)}`;
   }
 
+  let sensor = null;
+  function startQuatSensor(){
+    if(typeof RelativeOrientationSensor === 'undefined') return false;
+    try{
+      sensor = new RelativeOrientationSensor({frequency:60, referenceFrame:'device'});
+      sensor.addEventListener('reading', ()=>{
+        const q = sensor.quaternion;   // [x,y,z,w], уже после сенсор-фьюжна
+        if(!q) return;
+        have = true; visualFromQuat = true;
+        curQ = q;
+        // применяем калибровочный офсет как q_rel = conj(refQ) · q
+        const qr = refQ ? qMul(refQ, q) : q;
+        rig.style.transform = matFromQuat(qr[0],qr[1],qr[2],qr[3]);
+        status.innerHTML = 'АКТИВНО · <span class="live">QUAT · СИГНАЛ ЕСТЬ</span>';
+      });
+      sensor.addEventListener('error', e=>{
+        // NotAllowedError / NotReadableError -> откат на Эйлер
+        visualFromQuat = false; sensor = null;
+      });
+      sensor.start();
+      return true;
+    }catch(err){ sensor = null; return false; }
+  }
+
   function attach(){
+    startQuatSensor();  // если получится — визуал пойдёт с кватерниона
     window.addEventListener('deviceorientation', onOrient, true);
     window.addEventListener('devicemotion', onMotion, true);
     // если через 1.2с тишина — скорее всего нет сенсоров / не https
@@ -356,11 +406,16 @@
   document.getElementById('start').addEventListener('click', start);
 
   zeroBtn.addEventListener('click', ()=>{
-    off = {a:cur.a, b:cur.b, g:cur.g}; zeroed=true;
-    unzeroBtn.classList.remove('hidden');
+    if(visualFromQuat){
+      // корректная калибровка поворотом: снимаем текущую ориентацию как опорную
+      refQ = qConj(curQ);
+    }else{
+      off = {a:cur.a, b:cur.b, g:cur.g};
+    }
+    zeroed=true; unzeroBtn.classList.remove('hidden');
   });
   unzeroBtn.addEventListener('click', ()=>{
-    off = {a:0,b:0,g:0}; zeroed=false;
+    off = {a:0,b:0,g:0}; refQ = null; zeroed=false;
     unzeroBtn.classList.add('hidden');
   });
 })();
